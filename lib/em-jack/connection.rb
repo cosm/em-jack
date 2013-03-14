@@ -6,8 +6,6 @@ module EMJack
   class Connection
     include EM::Deferrable
 
-    RETRY_COUNT = 5
-
     @@handlers = []
 
     attr_accessor :host, :port
@@ -27,12 +25,15 @@ module EMJack
         @host = opts[:host] || 'localhost'
         @port = opts[:port] || 11300
         @tube = opts[:tube]
+        @max_retries = opts[:retries]
       when String
         uri = URI.parse(opts)
         @host = uri.host || 'localhost'
         @port = uri.port || 11300
         @tube = uri.path.gsub(/^\//, '') # Kill the leading /
       end
+
+      @max_retries ||= 5
 
       reset_tube_state
 
@@ -284,7 +285,7 @@ module EMJack
       set_deferred_status(nil)
       d.each { |df| df.fail(:disconnected) }
 
-      if @retries >= RETRY_COUNT
+      if @retries >= @max_retries
         if @disconnected_callback
           @disconnected_callback.call
         else
